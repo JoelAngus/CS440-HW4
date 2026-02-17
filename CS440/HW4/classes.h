@@ -92,7 +92,6 @@ public:
         //  You should write the first entry of the slot_directory, which have the info about the first record at the bottom of the page, before overflowPointerIndex.
 
         int slot_offset = 4096;
-        slot_offset -= sizeof(int);
         // Write overflow pointer
         slot_offset -= sizeof(int);
         memcpy(page_data + slot_offset, &overflowPointerIndex, sizeof(int));
@@ -131,8 +130,6 @@ public:
 
             while (slot_offset >= 0) {
                 int size, offset;
-
-                // check bounds before reading
                 if (slot_offset - sizeof(int) < 0) break;
                 memcpy(&size, page_data + slot_offset, sizeof(int));
                 slot_offset -= sizeof(int);
@@ -145,22 +142,23 @@ public:
                 if (offset < 0 || offset >= 4096 || size <= 0 || size > 4096) break;
 
                 slot_directory.push_back({offset, size});
-
-                // optional: stop if offset/size is zero
                 if (offset == 0 && size == 0) break;
             }
 
             for (auto &entry : slot_directory) {
                 if (entry.first < 0 || entry.first + entry.second > 4096) continue;
-                const char *p = page_data + entry.first;
+                const char *p = page_data;
 
                 int id = *reinterpret_cast<const int*>(p); p += sizeof(int);
                 int manager_id = *reinterpret_cast<const int*>(p); p += sizeof(int);
+
                 int name_len = *reinterpret_cast<const int*>(p); p += sizeof(int);
-                string name(p, name_len); p += name_len;
+                string name;
+                name.assign(p, name_len); //why no work
+                p += name_len;
+                
                 int bio_len = *reinterpret_cast<const int*>(p); p += sizeof(int);
                 string bio(p, bio_len);
-
                 vector<string> fields = {to_string(id), name, bio, to_string(manager_id)};
                 records.push_back(Record(fields));
             }
@@ -252,7 +250,7 @@ private:
         // TODO:
         //  - Search for the record by ID in the page
         //  - Check for overflow pages and report if record with given ID is not found
-        cout<<"Length of page.records: "<<page.records.size()<<"\n";
+        cout<<"Length of page: "<<page.cur_size<<"\n";
         for (auto &r : page.records) {
         if (r.id == id) {
             cout << "Employee found in page " << pageIndex << ":\n";

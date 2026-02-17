@@ -93,12 +93,19 @@ public:
 
         int slot_offset = 4096;
         slot_offset -= sizeof(int);
+        // Write overflow pointer
+        slot_offset -= sizeof(int);
         memcpy(page_data + slot_offset, &overflowPointerIndex, sizeof(int));
+
+        // Write slot directory entries in reverse order
         for (int i = slot_directory.size() - 1; i >= 0; i--) {
+            // Write size
             slot_offset -= sizeof(int);
             memcpy(page_data + slot_offset, &slot_directory[i].second, sizeof(int));
+
+            // Write offset
             slot_offset -= sizeof(int);
-            memcpy(page_data + slot_offset, &slot_directory[i].first, sizeof(int)); 
+            memcpy(page_data + slot_offset, &slot_directory[i].first, sizeof(int));
         }
 
         // Write the page_data buffer to the output stream
@@ -118,30 +125,30 @@ public:
 
             // Read overflow pointer
            int slot_offset = 4096 - sizeof(int);  // overflow pointer
-memcpy(&overflowPointerIndex, page_data + slot_offset, sizeof(int));
+            memcpy(&overflowPointerIndex, page_data + slot_offset, sizeof(int));
 
-slot_offset -= sizeof(int);
+            slot_offset -= sizeof(int);
 
-while (slot_offset >= 0) {
-    int size, offset;
+            while (slot_offset >= 0) {
+                int size, offset;
 
-    // check bounds before reading
-    if (slot_offset - sizeof(int) < 0) break;
-    memcpy(&size, page_data + slot_offset, sizeof(int));
-    slot_offset -= sizeof(int);
+                // check bounds before reading
+                if (slot_offset - sizeof(int) < 0) break;
+                memcpy(&size, page_data + slot_offset, sizeof(int));
+                slot_offset -= sizeof(int);
 
-    if (slot_offset - sizeof(int) < 0) break;
-    memcpy(&offset, page_data + slot_offset, sizeof(int));
-    slot_offset -= sizeof(int);
+                if (slot_offset - sizeof(int) < 0) break;
+                memcpy(&offset, page_data + slot_offset, sizeof(int));
+                slot_offset -= sizeof(int);
 
-    // sanity check
-    if (offset < 0 || offset >= 4096 || size <= 0 || size > 4096) break;
+                // sanity check
+                if (offset < 0 || offset >= 4096 || size <= 0 || size > 4096) break;
 
-    slot_directory.push_back({offset, size});
+                slot_directory.push_back({offset, size});
 
-    // optional: stop if offset/size is zero
-    if (offset == 0 && size == 0) break;
-}
+                // optional: stop if offset/size is zero
+                if (offset == 0 && size == 0) break;
+            }
 
             for (auto &entry : slot_directory) {
                 if (entry.first < 0 || entry.first + entry.second > 4096) continue;
@@ -245,7 +252,7 @@ private:
         // TODO:
         //  - Search for the record by ID in the page
         //  - Check for overflow pages and report if record with given ID is not found
-
+        cout<<"Length of page.records: "<<page.records.size()<<"\n";
         for (auto &r : page.records) {
         if (r.id == id) {
             cout << "Employee found in page " << pageIndex << ":\n";
@@ -302,24 +309,38 @@ public:
             //   - Get the page index from PageDirectory. If it's not in PageDirectory, define a new page using nextFreePage.
             //   - Insert the record into the appropriate page in the index file using addRecordToIndex() function.
 
-            int hashValue = compute_hash_value(record.id);
-            if (hashValue >= PageDirectory.size()) {
-                PageDirectory.resize(hashValue + 1, -1);
+            int h = compute_hash_value(record.id);
+
+            // If this bucket has not been created yet
+            if (PageDirectory.empty()) {
+                PageDirectory.assign(256, -1);   // initialize once
             }
-            int pageIndex;
-            if (PageDirectory[hashValue] == -1) {
-                pageIndex = nextFreePage++;
-                PageDirectory[hashValue] = pageIndex;
-                ofstream indexFile(fileName, ios::binary | ios::in | ios::out | ios::app);
+
+            // If bucket does not exist, create a new page
+            if (PageDirectory[h] == -1) {
+
+                int newPageIndex = nextFreePage++;
+                PageDirectory[h] = newPageIndex;
+
+                // Create empty page in file
+                fstream indexFile(fileName, ios::binary | ios::in | ios::out);
+
+                // If file does not exist yet, create it
+                if (!indexFile) {
+                    indexFile.open(fileName, ios::binary | ios::out);
+                    indexFile.close();
+                    indexFile.open(fileName, ios::binary | ios::in | ios::out);
+                }
+
                 Page newPage;
-                indexFile.seekp(pageIndex * 4096, ios::beg);
+                indexFile.seekp(newPageIndex * Page_SIZE, ios::beg);
                 newPage.write_into_data_file(indexFile);
                 indexFile.close();
-            } else {
-                pageIndex = PageDirectory[hashValue];
             }
-            Page tempPage;
-            addRecordToIndex(pageIndex, tempPage, record);
+
+            // Insert record into the correct bucket
+            Page dummyPage;   // required to match your existing function signature
+            addRecordToIndex(PageDirectory[h], dummyPage, record);
         }
 
         // Close the CSV file
@@ -335,7 +356,8 @@ public:
         //  - Compute hash value for the given ID using compute_hash_value() function
         //  - Search for the record in the page corresponding to the hash value using searchRecordByIdInPage() function
         int h = compute_hash_value(id);
-        if (h >= PageDirectory.size() || PageDirectory[h] == -1) {
+        if (h >= PageDirectory.size()) {
+            cout<< PageDirectory.size();
             cout << "Employee not found\n";
             return;
         }
@@ -346,7 +368,6 @@ public:
             cout << "Employee not found\n";
             return;
         }
-
         searchRecordByIdInPage(pageIndex, id);
         // Close the index file
         indexFile.close();

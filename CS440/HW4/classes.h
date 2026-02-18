@@ -92,22 +92,17 @@ public:
         //  You should write the first entry of the slot_directory, which have the info about the first record at the bottom of the page, before overflowPointerIndex.
 
         int slot_offset = 4096;
-        // Write overflow pointer
         slot_offset -= sizeof(int);
         memcpy(page_data + slot_offset, &overflowPointerIndex, sizeof(int));
-
-        // Write slot directory entries in reverse order
         for (int i = slot_directory.size() - 1; i >= 0; i--) {
-            // Write size
+            //size
             slot_offset -= sizeof(int);
             memcpy(page_data + slot_offset, &slot_directory[i].second, sizeof(int));
 
-            // Write offset
+            //offset
             slot_offset -= sizeof(int);
             memcpy(page_data + slot_offset, &slot_directory[i].first, sizeof(int));
         }
-
-        // Write the page_data buffer to the output stream
         out.write(page_data, sizeof(page_data));
     }
 
@@ -122,8 +117,7 @@ public:
             records.clear();
             slot_directory.clear();
 
-            // Read overflow pointer
-           int slot_offset = 4096 - sizeof(int);  // overflow pointer
+            int slot_offset = 4096 - sizeof(int);  //overflow pointer
             memcpy(&overflowPointerIndex, page_data + slot_offset, sizeof(int));
 
             slot_offset -= sizeof(int);
@@ -138,7 +132,7 @@ public:
                 memcpy(&offset, page_data + slot_offset, sizeof(int));
                 slot_offset -= sizeof(int);
 
-                // sanity check
+                //check just in case
                 if (offset < 0 || offset >= 4096 || size <= 0 || size > 4096) break;
 
                 slot_directory.push_back({offset, size});
@@ -224,7 +218,7 @@ private:
                 return;
             }
             if (page.overflowPointerIndex == -1) {
-                page.overflowPointerIndex = nextFreePage++; // Create new overflow page
+                page.overflowPointerIndex = nextFreePage++; //create new overflow page
                 indexFile.seekp(pageIndex * Page_SIZE, ios::beg);
                 page.write_into_data_file(indexFile);
                 pageIndex = page.overflowPointerIndex;
@@ -250,10 +244,9 @@ private:
         // TODO:
         //  - Search for the record by ID in the page
         //  - Check for overflow pages and report if record with given ID is not found
-        cout<<"Length of page: "<<page.cur_size<<"\n";
         for (auto &r : page.records) {
         if (r.id == id) {
-            cout << "Employee found in page " << pageIndex << ":\n";
+            cout << "Employee found\n";
             r.print();
             return;
             }   
@@ -267,7 +260,7 @@ private:
             overflowPage.read_from_data_file(indexFile);
             for (auto &r : overflowPage.records) {
                 if (r.id == id) {
-                    cout << "Employee found in overflow page " << next << ":\n";
+                    cout << "Employee found in overflow page\n";
                     r.print();
                     return;
                 }
@@ -309,36 +302,26 @@ public:
 
             int h = compute_hash_value(record.id);
 
-            // If this bucket has not been created yet
             if (PageDirectory.empty()) {
-                PageDirectory.assign(256, -1);   // initialize once
+                PageDirectory.assign(256, -1);  
             }
-
-            // If bucket does not exist, create a new page
             if (PageDirectory[h] == -1) {
 
                 int newPageIndex = nextFreePage++;
                 PageDirectory[h] = newPageIndex;
-
-                // Create empty page in file
                 fstream indexFile(fileName, ios::binary | ios::in | ios::out);
-
-                // If file does not exist yet, create it
                 if (!indexFile) {
                     indexFile.open(fileName, ios::binary | ios::out);
                     indexFile.close();
                     indexFile.open(fileName, ios::binary | ios::in | ios::out);
                 }
-
                 Page newPage;
                 indexFile.seekp(newPageIndex * Page_SIZE, ios::beg);
                 newPage.write_into_data_file(indexFile);
                 indexFile.close();
             }
-
-            // Insert record into the correct bucket
-            Page dummyPage;   // required to match your existing function signature
-            addRecordToIndex(PageDirectory[h], dummyPage, record);
+            Page q;
+            addRecordToIndex(PageDirectory[h], q, record);
         }
 
         // Close the CSV file
@@ -355,7 +338,6 @@ public:
         //  - Search for the record in the page corresponding to the hash value using searchRecordByIdInPage() function
         int h = compute_hash_value(id);
         if (h >= PageDirectory.size()) {
-            cout<< PageDirectory.size();
             cout << "Employee not found\n";
             return;
         }
@@ -367,6 +349,7 @@ public:
             return;
         }
         searchRecordByIdInPage(pageIndex, id);
+
         // Close the index file
         indexFile.close();
     }
